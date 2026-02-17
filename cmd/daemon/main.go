@@ -21,14 +21,15 @@ import (
 
 // Service represents a discovered HTTP service
 type Service struct {
-	ID      string
-	Name    string
-	Port    int
-	PID     int
-	ExePath string
-	Cwd     string
-	Args    []string
-	Proxy   *httputil.ReverseProxy
+	ID         string
+	Name       string
+	Port       int
+	TargetHost string // Target IP/host (default: 127.0.0.1)
+	PID        int
+	ExePath    string
+	Cwd        string
+	Args       []string
+	Proxy      *httputil.ReverseProxy
 }
 
 // Server manages the discovery and proxying of local services
@@ -65,14 +66,15 @@ func main() {
 	for _, record := range store.List() {
 		srv.generator.GenerateName(record.ExePath, "", record.Args) // Mark name as used
 		srv.services[record.Name] = &Service{
-			ID:      record.ID,
-			Name:    record.Name,
-			Port:    record.Port,
-			PID:     record.PID,
-			ExePath: record.ExePath,
-			Cwd:     "",
-			Args:    record.Args,
-			Proxy:   nil, // Will be created on first use
+			ID:         record.ID,
+			Name:       record.Name,
+			Port:       record.Port,
+			TargetHost: record.EffectiveTargetHost(),
+			PID:        record.PID,
+			ExePath:    record.ExePath,
+			Cwd:        "",
+			Args:       record.Args,
+			Proxy:      nil, // Will be created on first use
 		}
 	}
 
@@ -132,7 +134,7 @@ func (s *Server) discover() {
 		}
 
 		// Skip non-HTTP services (check if actually HTTP)
-		if !probe.IsHTTP(listener.Port) {
+		if !probe.IsHTTP("127.0.0.1", listener.Port) {
 			continue
 		}
 
@@ -205,13 +207,14 @@ func (s *Server) discover() {
 		// Add to runtime services
 		s.mu.Lock()
 		s.services[name] = &Service{
-			ID:      id,
-			Name:    name,
-			Port:    listener.Port,
-			PID:     listener.PID,
-			ExePath: listener.ExePath,
-			Cwd:     listener.Cwd,
-			Args:    listener.Args,
+			ID:         id,
+			Name:       name,
+			Port:       listener.Port,
+			TargetHost: "127.0.0.1",
+			PID:        listener.PID,
+			ExePath:    listener.ExePath,
+			Cwd:        listener.Cwd,
+			Args:       listener.Args,
 		}
 		s.mu.Unlock()
 
@@ -260,7 +263,7 @@ func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 
 	// Create proxy on first use
 	if service.Proxy == nil {
-		targetURL := fmt.Sprintf("http://127.0.0.1:%d", service.Port)
+		targetURL := fmt.Sprintf("http://%s:%d", service.TargetHost, service.Port)
 		target, err := url.Parse(targetURL)
 		if err != nil {
 			http.Error(w, "Invalid target URL", http.StatusInternalServerError)
@@ -277,7 +280,7 @@ func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 
 	// Update Host header to match the backend
 	r.Header.Set("X-Forwarded-Host", r.Host)
-	r.Host = fmt.Sprintf("127.0.0.1:%d", service.Port)
+	r.Host = fmt.Sprintf("%s:%d", service.TargetHost, service.Port)
 
 	service.Proxy.ServeHTTP(w, r)
 }
@@ -347,7 +350,11 @@ func (s *Server) handleAPIServices(w http.ResponseWriter, r *http.Request) {
 
 		// Quick health check
 		client := &http.Client{Timeout: 2 * time.Second}
-		resp, err := client.Get(fmt.Sprintf("http://127.0.0.1:%d", svc.Port))
+		targetHost := svc.TargetHost
+		if targetHost == "" {
+			targetHost = "127.0.0.1"
+		}
+		resp, err := client.Get(fmt.Sprintf("http://%s:%d", targetHost, svc.Port))
 		if err != nil {
 			swh.StatusText = "offline"
 		} else {

@@ -63,14 +63,27 @@ func main() {
 		cmdBlacklist(os.Args[2], os.Args[3])
 	case "add":
 		if len(os.Args) < 4 {
-			fmt.Fprintf(os.Stderr, "Usage: localhost-magic add <name> <port>\n")
+			fmt.Fprintf(os.Stderr, "Usage: localhost-magic add <name> [host:]<port>\n")
 			os.Exit(1)
 		}
-		port, err := strconv.Atoi(os.Args[3])
-		if err != nil {
-			log.Fatalf("Invalid port number: %s", os.Args[3])
+		target := os.Args[3]
+		var targetHost string
+		var port int
+		if idx := strings.LastIndex(target, ":"); idx != -1 {
+			// host:port format
+			targetHost = target[:idx]
+			port, err = strconv.Atoi(target[idx+1:])
+			if err != nil {
+				log.Fatalf("Invalid port number in %s", target)
+			}
+		} else {
+			// port only, default to 127.0.0.1
+			port, err = strconv.Atoi(target)
+			if err != nil {
+				log.Fatalf("Invalid port number: %s", target)
+			}
 		}
-		cmdAdd(store, os.Args[2], port)
+		cmdAdd(store, os.Args[2], port, targetHost)
 	case "help", "-h", "--help":
 		printUsage()
 	default:
@@ -88,7 +101,7 @@ func printUsage() {
 	fmt.Println("  localhost-magic rename <old> <new>            Rename a service")
 	fmt.Println("  localhost-magic keep <name> [true|false]      Toggle keep status (default: true)")
 	fmt.Println("  localhost-magic blacklist <type> <value>      Add to blacklist")
-	fmt.Println("  localhost-magic add <name> <port>             Add manual service entry")
+	fmt.Println("  localhost-magic add <name> [host:]<port>       Add manual service entry")
 	fmt.Println("  localhost-magic --config <path>               Use custom config path")
 	fmt.Println()
 	fmt.Println("Arguments:")
@@ -104,6 +117,7 @@ func printUsage() {
 	fmt.Println("  localhost-magic blacklist path /usr/sbin/cupsd")
 	fmt.Println("  localhost-magic blacklist pattern '^localhost-magic'")
 	fmt.Println("  localhost-magic add myapp.localhost 3000")
+	fmt.Println("  localhost-magic add myapp.localhost 192.168.0.1:3000")
 }
 
 func cmdList(store *storage.Store) {
@@ -115,8 +129,8 @@ func cmdList(store *storage.Store) {
 		return
 	}
 
-	fmt.Printf("%-30s %-8s %-8s %-6s %s\n", "NAME", "PORT", "PID", "KEEP", "COMMAND")
-	fmt.Println(strings.Repeat("-", 100))
+	fmt.Printf("%-30s %-22s %-8s %-6s %s\n", "NAME", "TARGET", "PID", "KEEP", "COMMAND")
+	fmt.Println(strings.Repeat("-", 110))
 
 	for _, r := range records {
 		cmd := r.ExePath
@@ -140,7 +154,8 @@ func cmdList(store *storage.Store) {
 			keepStr = "YES"
 		}
 
-		fmt.Printf("%-30s %-8d %-8d %-6s %s%s\n", r.Name, r.Port, r.PID, keepStr, markers, cmd)
+		target := fmt.Sprintf("%s:%d", r.EffectiveTargetHost(), r.Port)
+		fmt.Printf("%-30s %-22s %-8d %-6s %s%s\n", r.Name, target, r.PID, keepStr, markers, cmd)
 	}
 
 	fmt.Println()
@@ -214,19 +229,19 @@ func cmdBlacklist(blacklistType, value string) {
 	fmt.Println("      To blacklist immediately, use the web dashboard.")
 }
 
-func cmdAdd(store *storage.Store, name string, port int) {
+func cmdAdd(store *storage.Store, name string, port int, targetHost string) {
 	// Ensure .localhost suffix
 	if !strings.HasSuffix(name, ".localhost") {
 		name = name + ".localhost"
 	}
 
 	// Add the manual service
-	record, err := store.AddManualService(name, port)
+	record, err := store.AddManualService(name, port, targetHost)
 	if err != nil {
 		log.Fatalf("Failed to add service: %v", err)
 	}
 
-	fmt.Printf("Added manual service: %s -> 127.0.0.1:%d\n", record.Name, record.Port)
+	fmt.Printf("Added manual service: %s -> %s:%d\n", record.Name, record.EffectiveTargetHost(), record.Port)
 	fmt.Println("Note: This service will be kept even when not running.")
 	fmt.Println("      Restart the daemon to activate the proxy.")
 }

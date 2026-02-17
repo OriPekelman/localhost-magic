@@ -2,16 +2,16 @@ package probe
 
 import (
 	"bufio"
-	"fmt"
 	"net"
+	"strconv"
 	"strings"
 	"time"
 )
 
-// IsHTTP checks if the service on the given port speaks HTTP
+// IsHTTP checks if the service on the given host:port speaks HTTP
 // Sends a simple GET request and checks for HTTP response
-func IsHTTP(port int) bool {
-	addr := fmt.Sprintf("127.0.0.1:%d", port)
+func IsHTTP(host string, port int) bool {
+	addr := net.JoinHostPort(host, strconv.Itoa(port))
 
 	// Try to connect with timeout
 	conn, err := net.DialTimeout("tcp", addr, 500*time.Millisecond)
@@ -48,8 +48,8 @@ type ProbeResult struct {
 }
 
 // Probe performs a detailed HTTP probe and returns the response status line
-func Probe(port int) ProbeResult {
-	addr := fmt.Sprintf("127.0.0.1:%d", port)
+func Probe(host string, port int) ProbeResult {
+	addr := net.JoinHostPort(host, strconv.Itoa(port))
 
 	conn, err := net.DialTimeout("tcp", addr, 500*time.Millisecond)
 	if err != nil {

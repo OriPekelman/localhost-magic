@@ -49,6 +49,7 @@ $ cd ~/projects/myapp && npm run dev
 - **Service Lifecycle**: Keep services in dashboard even when not running
 - **Web Dashboard**: Beautiful management interface at http://localhost/
 - **Health Monitoring**: Real-time status indicators (200/404/500/offline)
+- **Remote Target Proxying**: Proxy to Docker containers or other machines on your network
 - **No DNS Server Needed**: Uses `.localhost` TLD which browsers auto-resolve to 127.0.0.1
 
 ## Architecture
@@ -131,6 +132,12 @@ Toggle keep status (persist service even when not running):
 Add a manual service entry (for services not currently running):
 ```bash
 ./localhost-magic add staging.localhost 8080
+```
+
+Add a service targeting a remote host (Docker container, another machine on the LAN, etc.):
+```bash
+./localhost-magic add myapp.localhost 192.168.0.1:3000
+./localhost-magic add docker-app.localhost 172.17.0.2:8080
 ```
 
 Blacklist services:
@@ -397,6 +404,19 @@ Example:
     "is_active": true,
     "keep": false,
     "last_seen": "2026-02-17T20:00:00Z"
+  },
+  {
+    "id": "manual-docker.localhost-172.17.0.2-8080",
+    "name": "docker.localhost",
+    "port": 8080,
+    "target_host": "172.17.0.2",
+    "pid": 0,
+    "exe_path": "manual",
+    "args": [],
+    "user_defined": true,
+    "is_active": false,
+    "keep": true,
+    "last_seen": "2026-02-17T20:00:00Z"
   }
 ]
 ```
@@ -405,6 +425,7 @@ Fields:
 - `id`: Unique identifier (SHA256 hash of exe path + args)
 - `name`: The .localhost domain name
 - `port`: Service port number
+- `target_host`: Target IP or hostname (default: `127.0.0.1`, omitted when default)
 - `pid`: Process ID (0 if manual entry)
 - `exe_path`: Path to executable
 - `args`: Command line arguments
@@ -480,7 +501,7 @@ Services are marked inactive when their PID disappears. They'll be hidden unless
 
 - **Port 80**: Needs root/sudo to bind privileged port
 - **HTTP only**: HTTPS services not yet supported
-- **Local only**: Only discovers services on 127.0.0.1
+- **Auto-discovery is local only**: Automatic scanning only finds services on 127.0.0.1 (use `add` with a host for remote targets)
 - **macOS**: Uses `lsof` which may require approving terminal in System Settings > Privacy & Security
 
 ## API Endpoints
@@ -501,7 +522,8 @@ The daemon exposes a REST API on port 80:
 - [x] Manual service entries
 - [ ] HTTPS support with automatic certificate generation
 - [ ] Integration with systemd/launchd for auto-start
-- [ ] Docker container detection
+- [x] Remote target proxying (Docker, LAN machines)
+- [ ] Docker container auto-detection
 - [ ] Custom TLD support (not just .localhost)
 - [ ] Persistent blacklist configuration
 

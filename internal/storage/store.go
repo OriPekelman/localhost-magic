@@ -10,16 +10,25 @@ import (
 
 // ServiceRecord represents a persisted service mapping
 type ServiceRecord struct {
-	ID          string    `json:"id"`           // Hash of exe+args
-	Name        string    `json:"name"`         // Assigned DNS name
-	Port        int       `json:"port"`         // Current port
-	PID         int       `json:"pid"`          // Current PID
-	ExePath     string    `json:"exe_path"`     // Real path to executable
-	Args        []string  `json:"args"`         // Command line arguments
-	UserDefined bool      `json:"user_defined"` // Whether name was manually set
-	IsActive    bool      `json:"is_active"`    // Whether service is currently running
-	LastSeen    time.Time `json:"last_seen"`    // Last time service was detected
-	Keep        bool      `json:"keep"`         // Whether to keep even when inactive
+	ID          string    `json:"id"`                    // Hash of exe+args
+	Name        string    `json:"name"`                  // Assigned DNS name
+	Port        int       `json:"port"`                  // Current port
+	TargetHost  string    `json:"target_host,omitempty"` // Target IP/host (default: 127.0.0.1)
+	PID         int       `json:"pid"`                   // Current PID
+	ExePath     string    `json:"exe_path"`              // Real path to executable
+	Args        []string  `json:"args"`                  // Command line arguments
+	UserDefined bool      `json:"user_defined"`          // Whether name was manually set
+	IsActive    bool      `json:"is_active"`             // Whether service is currently running
+	LastSeen    time.Time `json:"last_seen"`             // Last time service was detected
+	Keep        bool      `json:"keep"`                  // Whether to keep even when inactive
+}
+
+// EffectiveTargetHost returns the target host, defaulting to 127.0.0.1
+func (r *ServiceRecord) EffectiveTargetHost() string {
+	if r.TargetHost == "" {
+		return "127.0.0.1"
+	}
+	return r.TargetHost
 }
 
 // Store manages persistence of service name mappings
@@ -129,9 +138,13 @@ func (s *Store) UpdateKeep(id string, keep bool) error {
 }
 
 // AddManualService adds a service manually (for services not currently running)
-func (s *Store) AddManualService(name string, port int) (*ServiceRecord, error) {
+func (s *Store) AddManualService(name string, port int, targetHost string) (*ServiceRecord, error) {
+	if targetHost == "" {
+		targetHost = "127.0.0.1"
+	}
+
 	// Generate a unique ID for this manual entry
-	id := fmt.Sprintf("manual-%s-%d", name, port)
+	id := fmt.Sprintf("manual-%s-%s-%d", name, targetHost, port)
 
 	// Check if name is available
 	if _, exists := s.names[name]; exists {
@@ -142,6 +155,7 @@ func (s *Store) AddManualService(name string, port int) (*ServiceRecord, error) 
 		ID:          id,
 		Name:        name,
 		Port:        port,
+		TargetHost:  targetHost,
 		PID:         0,
 		ExePath:     "manual",
 		Args:        []string{},
