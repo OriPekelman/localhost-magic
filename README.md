@@ -507,4 +507,4 @@ The daemon exposes a REST API on port 80:
 
 ## License
 
-MIT
+BSD-3-Clause license
