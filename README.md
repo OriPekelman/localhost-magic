@@ -2,6 +2,10 @@
 
 Automatically assign `.localhost` DNS names to HTTP services running on your machine.
 
+![Dashboard](images/dashboard.png)
+
+![commandline](images/commandline.png)
+
 ## Quick Start
 
 ```bash
