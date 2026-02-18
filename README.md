@@ -517,19 +517,30 @@ The daemon exposes a REST API on port 80:
 - `POST /api/keep` - Update keep status (`{"name": "...", "keep": true/false}`)
 - `POST /api/blacklist` - Add to blacklist (`{"type": "pid|path|pattern", "value": "..."}`)
 
-## Future Ideas
+## Roadmap
+
+See [ROADMAP.md](ROADMAP.md) for the full development roadmap with detailed specs, dependency graphs, and parallelism guide.
+
+### Completed
 
 - [x] macOS support using `lsof`
 - [x] Web dashboard for managing services
 - [x] Service lifecycle management (keep/persist)
 - [x] Health status monitoring
 - [x] Manual service entries
-- [ ] HTTPS support with automatic certificate generation
-- [ ] Integration with systemd/launchd for auto-start
 - [x] Remote target proxying (Docker, LAN machines)
-- [ ] Docker container auto-detection
-- [ ] Custom TLD support (not just .localhost)
-- [ ] Persistent blacklist configuration
+
+### Planned (by milestone)
+
+| Milestone | Highlights |
+|---|---|
+| **1. Core Hardening** | Persistent blacklist, naming heuristics as data, subdomain auto-grouping |
+| **2. Local Dev TLS** | Zero-config HTTPS with local CA, wildcard certs, proxy config export ([spec](docs/specs/local-tls-authority.md)) |
+| **3. Containers** | Docker auto-detection, Compose-aware grouping |
+| **4. Peer-to-Peer** | mDNS discovery, access teammates' services as subdomains |
+| **5. Observability** | Connection metrics, dashboard activity indicators, traffic inspector |
+| **6. System Integration** | systemd/launchd auto-start, desktop notifications, optional GUI |
+| **7. Advanced Routing** | Custom TLD support with local DNS resolver |
 
 ## License
 
